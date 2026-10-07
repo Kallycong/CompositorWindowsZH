@@ -1,0 +1,26 @@
+#pragma once
+#include "core/Document.h"
+#include <functional>
+
+namespace compositor::graphics {
+struct RenderRegion {double x{},y{};int width{},height{};double unitsPerPixel{1};};
+// Receives the unmodified composited region, before this adjustment's blend,
+// opacity or masks. Returns adjusted premultiplied RGBA of the same dimensions.
+using AdjustmentCallback=std::function<std::shared_ptr<const Raster>(
+    const Layer&,std::shared_ptr<const Raster>,RenderRegion)>;
+class StackRenderer final:public IRasterBackend {
+public:
+    explicit StackRenderer(AdjustmentCallback adjustment={},std::shared_ptr<const LayerRenderPreview> preview={}):adjustment_(std::move(adjustment)),preview_(std::move(preview)){}
+    std::shared_ptr<const Raster> render(const Document&,int x,int y,int width,int height)const override;
+    // Physical display sampling on original geometry (steps 1/32 through 32768).
+    // Export stays at step 1. x/y is the corner before the first pixel center.
+    std::shared_ptr<const Raster> renderScaled(const Document&,double x,double y,int width,int height,double unitsPerPixel)const;
+    // Bounded non-adjustment preview patch, preserving the parent tile's exact
+    // floating-point sample expressions through integer pixel offsets.
+    std::shared_ptr<const Raster> renderScaledPatch(const Document&,double tileX,double tileY,int offsetX,int offsetY,int width,int height,double unitsPerPixel)const;
+    std::shared_ptr<const Raster> renderCursorRegion(const Document&,double x,double y,int width,int height,double unitsPerPixel)const;
+private:
+    AdjustmentCallback adjustment_;
+    std::shared_ptr<const LayerRenderPreview> preview_;
+};
+} // namespace compositor::graphics
